@@ -56,6 +56,11 @@ class PPOAgent:
     def compute_gae(rewards, masks, values, next_val=None, gamma=0.99, tau=0.95):
         """
         Compute GAE values for a sequence of rewards, masks, and estimated values.
+        
+        Used to compute Generalized Advantage Estimation (GAE) values, which are a
+        modified version of Advantage values that take into account the expected future
+        rewards beyond the next state. GAE values are used in the PPO algorithm to compute
+        the surrogate objective function.
 
         Args:
             rewards (numpy array): A sequence of rewards.
@@ -82,6 +87,10 @@ class PPOAgent:
     def compute_adv(rewards, masks, values, next_val=None, gamma=0.99, tau=0.95):
         """
         Compute Advantage values for a sequence of rewards, masks, and estimated values.
+
+        Used to compute regular Advantage values, which are the difference between the estimated state
+        value and the actual observed return at each timestep. Advantage values are also used in the PPO
+        algorithm to compute the surrogate objective function.
 
         Args:
             rewards (numpy array): A sequence of rewards.
