@@ -29,7 +29,7 @@ class PPOAgent:
         self.play_steps = self.timesteps
         
         self.adv_norm = False
-        self.gae = False
+        self.gae = True
         
         self.high_score = -np.inf
         self.avg_scores = []
@@ -44,75 +44,61 @@ class PPOAgent:
 
     def choose_action(self, state):
         dist = self.actor.forward(state)
-        #print(dist)
         value = self.critic.forward(state)
         action = dist.sample()
         
         prob = dist.log_prob(action)
-        #print(prob.shape)
-#
+
         return action.detach().cpu().numpy()[0], value.item(), prob.detach().cpu().numpy()[0]
 
-    def compute_gae(rewards, masks, values, next_val=None, gamma=0.99, tau=0.95):
-        """
-        Compute GAE values for a sequence of rewards, masks, and estimated values.
+    def compute_gae(self, rewards, masks, values, next_val=None):
+        # Initialize the returns list to an empty list
+        returns = []
         
-        Used to compute Generalized Advantage Estimation (GAE) values, which are a
-        modified version of Advantage values that take into account the expected future
-        rewards beyond the next state. GAE values are used in the PPO algorithm to compute
-        the surrogate objective function.
+        # Initialize the GAE variable to zero
+        gae = 0
+        
+        # If a next value is provided, append it to the values array
+        value_ = np.append(values, next_val)
 
-        Args:
-            rewards (numpy array): A sequence of rewards.
-            masks (numpy array): A sequence of masks indicating whether an episode has ended.
-            values (numpy array): A sequence of estimated state values.
-            next_val (float, optional): The estimated value of the next state. Defaults to None.
-            gamma (float, optional): The discount factor. Defaults to 0.99.
-            tau (float, optional): The GAE parameter. Defaults to 0.95.
+        # Iterate over the rewards and masks in reverse order
+        for i in reversed(range(len(rewards))):
+            # Compute the TD residual
+            td_res = rewards[i] + self.gamma * value_[i+1] * masks[i] - value_[i]
+            
+            # Compute the GAE value
+            gae = td_res + self.gamma * self.tau * masks[i] * gae
+            
+            # Compute the return value for the current time step and insert it at the beginning of the returns list
+            returns.insert(0, gae + value_[i])
 
-        Returns:
-            numpy array: A sequence of GAE values.
-        """
-        returns = []  # Initialize the list to hold the GAE returns
-        gae = 0  # Initialize the GAE value to 0
-        value_ = np.append(values, next_val)  # Append the estimated value of the next state (if provided) to the list of values
+        # Convert the returns list to a PyTorch tensor and move it to the device
+        return torch.tensor(returns).to(self.device)
 
-        for i in reversed(range(len(rewards))):  # Iterate over the rewards in reverse order
-            td_res = rewards[i] + gamma * value_[i+1] * masks[i] - value_[i]  # Compute the TD residual
-            gae = td_res + gamma * tau * masks[i] * gae  # Update the GAE value
-            returns.insert(0, gae + value_[i])  # Insert the GAE return into the list of returns
+    def compute_adv(self, rewards, masks, values, next_val=None):
+        # Initialize the advantages array to zeros
+        advantages = np.zeros(len(rewards), dtype=np.float32)
+        
+        # Initialize the GAE variable to zero
+        gae = 0
+        
+        # If a next value is provided, append it to the values array
+        value_ = np.append(values, next_val)
 
-        return np.array(returns)  # Convert the list of returns to a numpy array and return it
+        # Iterate over the rewards and masks in reverse order
+        for i in reversed(range(len(rewards))):
+            # Compute the TD residual
+            td_res = rewards[i] + self.gamma * value_[i+1] * masks[i] - value_[i]
+            
+            # Compute the GAE value
+            gae = td_res + self.gamma * self.tau * masks[i] * gae
+            
+            # Set the advantage value for the current time step
+            advantages[i] = gae
 
-    def compute_adv(rewards, masks, values, next_val=None, gamma=0.99, tau=0.95):
-        """
-        Compute Advantage values for a sequence of rewards, masks, and estimated values.
+        # Convert the advantages array to a PyTorch tensor and move it to the device
+        return torch.tensor(advantages).to(self.device)
 
-        Used to compute regular Advantage values, which are the difference between the estimated state
-        value and the actual observed return at each timestep. Advantage values are also used in the PPO
-        algorithm to compute the surrogate objective function.
-
-        Args:
-            rewards (numpy array): A sequence of rewards.
-            masks (numpy array): A sequence of masks indicating whether an episode has ended.
-            values (numpy array): A sequence of estimated state values.
-            next_val (float, optional): The estimated value of the next state. Defaults to None.
-            gamma (float, optional): The discount factor. Defaults to 0.99.
-            tau (float, optional): The GAE parameter. Defaults to 0.95.
-
-        Returns:
-            numpy array: A sequence of Advantage values.
-        """
-        advantages = np.zeros(len(rewards), dtype=np.float32)  # Initialize the array to hold the Advantage values
-        gae = 0  # Initialize the GAE value to 0
-        value_ = np.append(values, next_val)  # Append the estimated value of the next state (if provided) to the list of values
-
-        for i in reversed(range(len(rewards))):  # Iterate over the rewards in reverse order
-            td_res = rewards[i] + gamma * value_[i+1] * masks[i] - value_[i]  # Compute the TD residual
-            gae = td_res + gamma * tau * masks[i] * gae  # Update the GAE value
-            advantages[i] = gae  # Store the GAE value as the Advantage value for this timestep
-
-        return advantages  # Return the array of Advantage values
 
 
     def learn(self, state_):
