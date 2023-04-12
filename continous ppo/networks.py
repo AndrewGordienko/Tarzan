@@ -34,8 +34,6 @@ class actor_network(nn.Module):
         dist = torch.distributions.Normal(mean, std)
         return dist
 
-
-
 class critic_network(nn.Module):
     def __init__(self, input_dims):
         super().__init__()
@@ -47,7 +45,9 @@ class critic_network(nn.Module):
         self.to(DEVICE)
 
     def forward(self, x):
-        x = torch.tensor([x]).float().to(DEVICE) if type(x) is not torch.Tensor else x
+        if len(x.shape) == 1:
+            x = x.unsqueeze(0)
+        x = torch.tensor(x).float().to(DEVICE)
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
 
