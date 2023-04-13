@@ -10,8 +10,8 @@ import warnings; warnings.filterwarnings('ignore')
 from agent import PPOAgent
 
 # Create the CartPole environment and the PPO agent
-env = gym.make('LunarLanderContinuous-v2')
-# env = gym.make('BipedalWalker-v3')
+# env = gym.make('LunarLanderContinuous-v2')
+env = gym.make('BipedalWalker-v3')
 agent = PPOAgent(env)
 
 # Initialize variables for tracking the score and episode returns
