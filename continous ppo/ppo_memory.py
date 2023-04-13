@@ -1,8 +1,8 @@
 import numpy as np
 import gym
 
-env = gym.make('LunarLanderContinuous-v2')
-#env = gym.make('BipedalWalker-v3')
+# env = gym.make('LunarLanderContinuous-v2')
+env = gym.make('BipedalWalker-v3')
 MEM_SIZE = 1000000
 BATCH_SIZE = 32
 
