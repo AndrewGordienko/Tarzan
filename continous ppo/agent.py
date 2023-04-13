@@ -8,7 +8,7 @@ import numpy as np
 import warnings; warnings.filterwarnings('ignore')
 from matplotlib.animation import FuncAnimation
 
-DEVICE = torch.device("cuda")
+DEVICE = torch.device("cpu")
 
 from networks import actor_network, critic_network
 from ppo_memory import PPOMemory
@@ -24,7 +24,7 @@ class PPOAgent:
         self.epochs = 4
         self.timesteps = 20
         self.mini_batch_size = 5
-        self.gamma = 0.99
+        self.gamma = 0.95
         self.tau = 0.95
         self.critic_coef = 0.5
         self.entropy_coef = 0.01
@@ -116,8 +116,6 @@ class PPOAgent:
             returns = self.compute_gae(rewards, dones, values, next_val=next_val)
             advantages = (returns.cpu() - values).flatten()
 
-            advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
-
             # Convert the arrays to PyTorch tensors and move them to the device
             states = torch.tensor(states).float().to(self.device)
             actions = torch.tensor(actions).float().to(self.device)
@@ -134,6 +132,9 @@ class PPOAgent:
                 old_log_prob = log_probs[batch]
                 return_ = returns[batch].to(self.device)
                 adv_ = advantages[batch].to(self.device)
+
+                # Normalize the advantages for the current mini-batch
+                adv_ = (adv_ - adv_.mean()) / (adv_.std() + 1e-8)
 
                 # Compute the ratio of the new and old probabilities and the surrogate losses
                 dist = self.actor(state)
