@@ -8,7 +8,7 @@ import numpy as np
 import warnings; warnings.filterwarnings('ignore')
 from matplotlib.animation import FuncAnimation
 
-DEVICE = torch.device("cpu")
+DEVICE = torch.device("cuda")
 
 from networks import actor_network, critic_network
 from ppo_memory import PPOMemory
@@ -32,7 +32,7 @@ class PPOAgent:
         self.play_steps = self.timesteps
         
         self.adv_norm = False
-        self.gae = True
+        self.gae = False
         
         self.high_score = -np.inf
         self.avg_scores = []
@@ -113,12 +113,10 @@ class PPOAgent:
             states, actions, rewards, values, log_probs, dones = self.memory.get_nps()
 
             # Compute the GAE or ADV values for the batch of experiences
-            if self.gae:
-                gae_returns =  self.compute_gae(rewards, dones, values, next_val=next_val)
-                advantages = (gae_returns - values).flatten()
-            else:
-                returns = self.compute_returns(rewards, dones, next_val=next_val)
-                advantages = self.compute_advantages(returns, values)
+            returns = self.compute_gae(rewards, dones, values, next_val=next_val)
+            advantages = (returns.cpu() - values).flatten()
+
+            advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
             # Convert the arrays to PyTorch tensors and move them to the device
             states = torch.tensor(states).float().to(self.device)
@@ -134,26 +132,28 @@ class PPOAgent:
                 state = states[batch]
                 action = actions[batch]
                 old_log_prob = log_probs[batch]
-                return_ = gae_returns[batch] if self.gae else returns[batch]
-                adv_ = advantages[batch]
+                return_ = returns[batch].to(self.device)
+                adv_ = advantages[batch].to(self.device)
 
                 # Compute the ratio of the new and old probabilities and the surrogate losses
                 dist = self.actor(state)
                 value_ = self.critic(state)
                 new_log_prob = dist.log_prob(action).sum(dim=-1, keepdim=True)
                 entropy = dist.entropy().mean()
-                ratio = (new_log_prob - old_log_prob).exp()
+                ratio = (new_log_prob - old_log_prob).clamp(min=-10, max=10).exp()
                 surr1 = ratio * adv_
                 surr2 = torch.clamp(ratio, 1.0 - self.epsilon, 1.0 + self.epsilon) * adv_
 
                 # Compute the actor and critic losses and the total loss
                 actor_loss = -torch.min(surr1, surr2).mean()
-                critic_loss = (return_ - value_).pow(2).mean()
+                critic_loss = (return_ - value_).pow(2).mean() + 1e-8
                 total_loss = actor_loss + self.critic_coef * critic_loss - self.entropy_coef * entropy
 
                 # Zero out the gradients, backpropagate the total loss, and update the network parameters
                 self.actor.optimizer.zero_grad()
                 self.critic.optimizer.zero_grad()
                 total_loss.backward()
+                torch.nn.utils.clip_grad_norm_(self.actor.parameters(), max_norm=1)
+                torch.nn.utils.clip_grad_norm_(self.critic.parameters(), max_norm=1)
                 self.actor.optimizer.step()
                 self.critic.optimizer.step()
