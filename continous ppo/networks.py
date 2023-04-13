@@ -8,7 +8,7 @@ import numpy as np
 import warnings; warnings.filterwarnings('ignore')
 from matplotlib.animation import FuncAnimation
 
-DEVICE = torch.device("cuda")
+DEVICE = torch.device("cpu")
 
 # Define actor and critic networks
 class actor_network(nn.Module):
@@ -21,8 +21,8 @@ class actor_network(nn.Module):
         self.mean = nn.Linear(256, n_actions)
         self.log_std = nn.Linear(256, n_actions)
 
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=3e-4)
-        self.device = torch.device('cuda')
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=1e-4)
+        self.device = torch.device('cpu')
         self.to(self.device)
     
     def init_weights(self, layer):
@@ -52,7 +52,7 @@ class critic_network(nn.Module):
         self.fc1 = nn.Linear(input_dims, 256)
         self.fc2 = nn.Linear(256, 1)
 
-        self.optimizer = Adam(self.parameters(), lr=3e-4)
+        self.optimizer = Adam(self.parameters(), lr=1e-4)
         self.to(DEVICE)
     
     def init_weights(self, layer):
