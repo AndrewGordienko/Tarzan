@@ -22,7 +22,7 @@ class PPOAgent:
         self.env = env
 
         self.epochs = 4
-        self.timesteps = 20
+        self.timesteps = 100
         self.mini_batch_size = 5
         self.gamma = 0.95
         self.tau = 0.95
