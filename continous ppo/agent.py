@@ -40,6 +40,8 @@ class PPOAgent:
 
         self.actor = actor_network(self.n_actions, self.input_shape)
         self.critic = critic_network(self.input_shape)
+        self.actor.optimizer = Adam(self.actor.parameters(), lr=1e-4, betas=(0.9, 0.5))
+        self.critic.optimizer = Adam(self.critic.parameters(), lr=3e-4, betas=(0.9, 0.5))
         
         self.device = self.actor.device
         
